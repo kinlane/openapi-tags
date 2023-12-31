@@ -1,0 +1,185 @@
+---
+layout: page
+width: expand
+---
+<div class="uk-section">
+    <div class="uk-container uk-container-xlarge">
+
+        <h1 class="uk-article-title">OpenAPI Tags</h1>
+        <p>Very few of the OpenAPI definitions I come across are appropriately tagged, centrally, and across operations. There is a lot of richness (sometimes) in the design of any API, which can be used to generate tags.</p>
+        <p>This is a simple tool for updating the tags of an OpenAPI using the path, summary, and curation of a human user, deciding what should be applied.</p>
+        <h2>OpenAPI</h2>
+        <input type="text" id="format" style="width: 100%;"> 
+        <textarea style="width: 100%; height: 250px; border: 5px solid #000;" id="openapi" onchange="updateOpenAPI();"></textarea>
+        <h2>Tags</h2>
+        <p>The tags applied centrally.</p>
+        <div id="tags"></div>      
+        <h2>Operations</h2>
+        <p>The tags applied to operations.</p>
+        <div id="operation-tags"></div>
+        <script>
+            function saveOpenAPI(openapi){
+                var format = document.getElementById('format').value;
+                if(format=='json'){
+                    document.getElementById('openapi').value = JSON.stringify(openapi, null, 2); 
+                }
+                if(format=='yaml'){
+                    document.getElementById('openapi').value = jsyaml.dump(openapi); 
+                }                
+            }
+
+            function parseOpenAPI(){
+                var openapi = document.getElementById('openapi').value;
+
+                var is_yaml = 0;
+                var is_json = 0;
+
+                try {
+                    var openapi = jsyaml.load(openapi);
+                    console.log(openapi);
+                    is_yaml = 1;
+                    is_json = 0;
+                } catch (error) {
+                    console.log(error);
+                }
+                try {
+                    var openapi = JSON.parse(openapi);
+                    is_json = 1;
+                    is_yaml = 0;
+                } catch (error) {}
+
+                if(is_json==1){
+                    document.getElementById("format").value = "json";
+                }
+                else{
+                    document.getElementById("format").value = "yaml";  
+                }
+                return openapi;                
+            }
+                 
+            function updateTagName(id){
+                var openapi = parseOpenAPI();
+                
+                var tag_name = document.getElementById('tag-name-'+id).value;
+                openapi.tags[id].name = tag_name;
+                
+                saveOpenAPI(openapi);                  
+            }  
+
+            function updateTagDescription(id){
+                var openapi = parseOpenAPI();
+                
+                var tag_description = document.getElementById('tag-description-'+id).value;
+                openapi.tags[id].description = tag_description;
+                
+                saveOpenAPI(openapi);                  
+            }              
+
+            function updateOperationTags(path,verb,id){
+                var openapi = parseOpenAPI();
+                
+                var save_tags = document.getElementById(id).value;
+                var all_tags = save_tags.split(",");
+                openapi.paths[path][verb].tags = all_tags;
+
+                for (let i = 0; i < all_tags.length; i++) {
+
+                    var already = 0;
+                    for (let j = 0; j < openapi.tags.length; j++) {
+
+                        if(all_tags[i] == openapi.tags[j].name){
+                            already = 1; 
+                        }
+
+                    }
+                    if(already==0){
+                        var t = {};
+                        t.name = all_tags[i];
+                        t.description = "Needs a description.";
+                        openapi.tags.push(t);
+                    }
+
+                }
+
+                saveOpenAPI(openapi);                  
+            }            
+
+            function updateOpenAPI(){
+
+                var openapi = parseOpenAPI();
+                //console.log(openapi)
+
+                if(openapi.tags){
+                    var tags = openapi.tags;
+                    var tag_counter = 0;
+                    for (let i = 0; i < tags.length; i++) {
+                        console.log("tag: " + tags[i].name);
+                        html += '<div class="mb-3">';
+                        html += '<label for="tag-name-' + tag_counter + '" class="form-label">Tag Name</label>';
+                        html += '<input type="text" class="form-control" id="tag-name-' + tag_counter + '" style="width: 100%;" value="' + tags[i].name + '" onchange="updateTagName(' + tag_counter + ')">';
+                        html += '</div>';
+
+                        html += '<div class="mb-3">';
+                        html += '<label for="tag-description-' + tag_counter + '" class="form-label">Tag Description</label>';
+                        html += '<textarea class="form-control" id="tag-description-' + tag_counter + '" rows="4" style="width: 100%;" onchange="updateTagDescription(' + tag_counter + ')">' + tags[i].description + '</textarea>';
+                        html += '</div>'; 
+                        tag_counter++;                   
+                    }                    
+                    document.getElementById('tags').innerHTML = html;
+                }
+
+                var html = '';
+                if(openapi.paths){
+                    var operation_counter = 1;
+                    for (const [path, method] of Object.entries(openapi.paths)) {
+                        
+                        //console.log(path);
+
+                        html += '<h3>' + path + '</h3>';
+
+                        for (const [verb, operation] of Object.entries(method)) {
+                            
+                            //console.log(verb);
+                            if(verb == 'get' || verb == 'post' || verb == 'patch' || verb == 'put' || verb == 'delete'){
+
+                            html += '<h4>' + verb + '</h4>';
+
+                            var operation_tags = operation.tags;
+
+                            // parse path
+                            var path_words = path.split("/");
+                            for (let i = 0; i < path_words.length; i++) {
+                                var t = path_words[i];
+                                var t = t.replace(/\{/g,'');
+                                var t = t.replace(/\}/g,'');
+                                if(t!=''&&t!='v1'){
+                                    operation_tags.push(t)
+                                }
+                            }
+
+                            //parse summary
+                            var summary_words = operation.summary.split(" ");
+                            for (let i = 0; i < summary_words.length; i++) {
+                                var t = summary_words[i];
+                                if(t!=''&&t!='v1'){
+                                    operation_tags.push(t)
+                                }
+                            }
+
+                            html += '<div class="mb-3">';
+                            html += '<label for="central-tags" class="form-label">Description</label>';
+                            html += '<textarea class="form-control" id="operation-description-' + operation_counter + '" rows="4" style="width: 100%;" onchange="updateOperationTags(' + "'" + path + "'" + ',' + "'" + verb + "'" + ',this.id)">' + operation_tags + '</textarea>';
+                            html += '</div>';
+
+                            operation_counter++;
+                            
+                            }
+                        }                    
+                    }
+                }
+                document.getElementById('operation-tags').innerHTML = html;
+
+            }
+        </script>
+    </div>
+</div>

@@ -146,6 +146,10 @@ width: expand
 
                             var operation_tags = operation.tags;
 
+                            if(!operation_tags){
+                                operation_tags = [];
+                            }
+
                             // parse path
                             var path_words = path.split("/");
                             for (let i = 0; i < path_words.length; i++) {

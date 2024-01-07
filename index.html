@@ -24,7 +24,7 @@ width: expand
                     document.getElementById('openapi').value = JSON.stringify(openapi, null, 2); 
                 }
                 if(format=='yaml'){
-                    document.getElementById('openapi').value = jsyaml.dump(openapi); 
+                    document.getElementById('openapi').value = jsyaml.dump(openapi) + '\r\n---'; 
                 }                
             }
 
